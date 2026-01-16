@@ -70,8 +70,42 @@ const initConfig: CustomInitConfig = {
 	},
 };
 
+let hasInitialized = false;
+
 const initAuth = () => {
+	if (hasInitialized) return;
+
+	// next-firebase-auth validates config during init(). When env vars are missing
+	// (common in fresh dev setups or CI), we prefer a clear warning over a hard crash.
+	const apiKey = process.env.NEXT_PUBLIC_FIREBASE_PUBLIC_API_KEY;
+	if (!apiKey) {
+		console.warn(
+			"next-firebase-auth not initialized: missing NEXT_PUBLIC_FIREBASE_PUBLIC_API_KEY. See .env.local.example."
+		);
+		return;
+	}
+
+	// If we're on the server and admin creds are missing, skip init to avoid runtime crashes.
+	// API routes that depend on token verification will not work until these are provided.
+	if (typeof window === "undefined") {
+		const missingAdmin =
+			!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+			!process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
+			!process.env.FIREBASE_CLIENT_EMAIL ||
+			!process.env.FIREBASE_PRIVATE_KEY ||
+			!process.env.COOKIE_SECRET_CURRENT ||
+			!process.env.COOKIE_SECRET_PREVIOUS;
+
+		if (missingAdmin) {
+			console.warn(
+				"next-firebase-auth not initialized on server: missing Firebase Admin / cookie env vars. See .env.local.example."
+			);
+			return;
+		}
+	}
+
 	init(initConfig);
+	hasInitialized = true;
 };
 
 export default initAuth;
